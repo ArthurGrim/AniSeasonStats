@@ -81,6 +81,7 @@ def calculate_statistics(data, season, year, global_mean=7.0, total_count=50):
             "anime_count": 0,
             "mean_score": 0,
             "weighted_mean": 0,
+            "combined_weighted_mean": 0,
             "anime_list": []
         }
 
@@ -103,7 +104,15 @@ def calculate_statistics(data, season, year, global_mean=7.0, total_count=50):
                     popularities.append(popularity)
 
     mean_score = round(sum(scores) / len(scores), 2) if scores else 0
-    weighted_mean = calculate_combined_weighted_mean(
+    weighted_mean = round(
+        sum(score * pop for score, pop in zip(scores, popularities) if score > 0) /
+        sum(pop for score, pop in zip(scores, popularities) if score > 0)
+        if sum(pop for score, pop in zip(scores, popularities) if score > 0) > 0
+        else 0, 2
+    ) if popularities else 0
+
+    # Kombinierter gewichteter Mittelwert
+    combined_weighted_mean = calculate_combined_weighted_mean(
         scores, popularities, season_mean=mean_score, global_mean=global_mean,
         seen_count=len(anime_list), total_count=total_count
     )
@@ -114,6 +123,7 @@ def calculate_statistics(data, season, year, global_mean=7.0, total_count=50):
         "anime_count": len(anime_list),
         "mean_score": mean_score,
         "weighted_mean": weighted_mean,
+        "combined_weighted_mean": combined_weighted_mean,
         "anime_list": anime_list
     }
 
@@ -147,7 +157,8 @@ def save_to_excel_with_formatting(all_stats, filename):
             "year": stat["year"],
             "anime_count": stat["anime_count"],
             "mean_score": stat["mean_score"],
-            "weighted_mean": stat["weighted_mean"]
+            "weighted_mean": stat["weighted_mean"],
+            "combined_weighted_mean": stat["combined_weighted_mean"]
         }
         for i, anime in enumerate(stat["anime_list"]):
             row[f"anime_{i + 1}"] = anime

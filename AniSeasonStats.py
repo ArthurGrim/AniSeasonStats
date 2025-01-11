@@ -41,7 +41,6 @@ def fetch_anime_data(username):
         return None
 
 def calculate_weighted_mean(scores, popularities, season_mean, global_mean, seen_count, total_count, wp=0.6, wa=0.4):
-    # Beliebtheits-basierter gewichteter Mittelwert
     if any(pop for score, pop in zip(scores, popularities) if score > 0):
         popularity_weighted_mean = (
             sum(score * pop for score, pop in zip(scores, popularities) if score > 0) /
@@ -50,19 +49,20 @@ def calculate_weighted_mean(scores, popularities, season_mean, global_mean, seen
     else:
         popularity_weighted_mean = 0
 
-    # Aktivitäts-basierter gewichteter Mittelwert
     activity_ratio = seen_count / total_count if total_count > 0 else 0
     activity_weighted_mean = (
         activity_ratio * season_mean + (1 - activity_ratio) * global_mean
     )
 
-    # Kombinierter gewichteter Mittelwert
     weighted_mean = round(
         wp * popularity_weighted_mean + wa * activity_weighted_mean, 2
     )
 
     return weighted_mean
 
+def season_order(season):
+    order = {"WINTER": 1, "SPRING": 2, "SUMMER": 3, "FALL": 4}
+    return order.get(season, 5)  # Default to a high number for unknown seasons
 
 def calculate_statistics(data, global_mean=7.0, total_count=50):
     if not data or "data" not in data or "MediaListCollection" not in data["data"]:
@@ -80,19 +80,21 @@ def calculate_statistics(data, global_mean=7.0, total_count=50):
 
                 key = (year, season)
                 if key not in stats_by_season:
-                    stats_by_season[key] = {"scores": [], "popularities": [], "titles": []}
+                    stats_by_season[key] = {"scores": [], "popularities": [], "titles": set()}
 
                 score = entry.get("score", 0)
                 title = media["title"]["romaji"]
-                formatted_entry = f"{score} - {title}"
-                stats_by_season[key]["titles"].append((score, title))
+                stats_by_season[key]["titles"].add((score, title))
                 if score:
                     stats_by_season[key]["scores"].append(score)
                 popularity = media.get("popularity", 0)
                 stats_by_season[key]["popularities"].append(popularity)
 
     stats = []
-    for (year, season), details in sorted(stats_by_season.items()):
+    for (year, season), details in sorted(stats_by_season.items(), key=lambda x: (x[0][0], season_order(x[0][1]))):
+        sorted_titles = sorted(details["titles"], key=lambda x: x[1])
+        formatted_titles = [f"{score} - {title}" for score, title in sorted_titles]
+
         scores = details["scores"]
         popularities = details["popularities"]
         mean_score = round(sum(scores) / len(scores), 2) if scores else 0
@@ -101,11 +103,6 @@ def calculate_statistics(data, global_mean=7.0, total_count=50):
             scores, popularities, season_mean=mean_score, global_mean=global_mean,
             seen_count=len(details["titles"]), total_count=total_count
         )
-
-        # Titel alphabetisch sortieren (nur basierend auf dem Titel, nicht dem Score)
-        sorted_titles = sorted(details["titles"], key=lambda x: x[1])
-        # Formatierte Liste mit Score wiederherstellen
-        formatted_titles = [f"{score} - {title}" for score, title in sorted_titles]
 
         stats.append({
             "season": season,
@@ -117,19 +114,18 @@ def calculate_statistics(data, global_mean=7.0, total_count=50):
         })
     return stats
 
-
 def save_to_excel_with_formatting(stats, filename):
     rows = []
     for stat in stats:
         row = {
-            "season": stat["season"],
-            "year": stat["year"],
-            "anime_count": stat["anime_count"],
-            "mean_score": stat["mean_score"],
-            "weighted_mean": stat["weighted_mean"],
+            "Season": stat["season"],
+            "Year": stat["year"],
+            "Anime Count": stat["anime_count"],
+            "Anime Score": stat["mean_score"],
+            "Weighted Score": stat["weighted_mean"],
         }
         for i, anime in enumerate(stat["anime_list"]):
-            row[f"anime_{i + 1}"] = anime
+            row[f"Anime {i + 1}"] = anime
         rows.append(row)
 
     df = pd.DataFrame(rows)

@@ -11,23 +11,24 @@ API_URL = "https://graphql.anilist.co"
 def fetch_anime_data(username):
     query = """
     query ($username: String) {
-        MediaListCollection(userName: $username, type: ANIME) {
-            lists {
-                entries {
-                    media {
-                        title {
-                            romaji
-                        }
-                        season
-                        seasonYear
-                        averageScore
-                        popularity
-                    }
-                    score
-                    status
-                }
+    MediaListCollection(userName: $username, type: ANIME) {
+        lists {
+        entries {
+            media {
+            title {
+                romaji
+            }
+            season
+            seasonYear
+            averageScore
+            popularity
+            }
+            score
+            status
             }
         }
+    }
+    
     }
     """
     variables = {"username": username}
@@ -40,22 +41,28 @@ def fetch_anime_data(username):
         return None
 
 def calculate_weighted_mean(scores, popularities, season_mean, global_mean, seen_count, total_count, wp=0.6, wa=0.4):
-    popularity_weighted_mean = (
-        sum(score * pop for score, pop in zip(scores, popularities) if score > 0) /
-        sum(pop for score, pop in zip(scores, popularities) if score > 0)
-        if popularities else 0
-    )
+    # Beliebtheits-basierter gewichteter Mittelwert
+    if any(pop for score, pop in zip(scores, popularities) if score > 0):
+        popularity_weighted_mean = (
+            sum(score * pop for score, pop in zip(scores, popularities) if score > 0) /
+            sum(pop for score, pop in zip(scores, popularities) if score > 0)
+        )
+    else:
+        popularity_weighted_mean = 0
 
+    # Aktivitäts-basierter gewichteter Mittelwert
     activity_ratio = seen_count / total_count if total_count > 0 else 0
     activity_weighted_mean = (
         activity_ratio * season_mean + (1 - activity_ratio) * global_mean
     )
 
+    # Kombinierter gewichteter Mittelwert
     weighted_mean = round(
         wp * popularity_weighted_mean + wa * activity_weighted_mean, 2
     )
 
     return weighted_mean
+
 
 def calculate_statistics(data, global_mean=7.0, total_count=50):
     if not data or "data" not in data or "MediaListCollection" not in data["data"]:
@@ -76,8 +83,9 @@ def calculate_statistics(data, global_mean=7.0, total_count=50):
                     stats_by_season[key] = {"scores": [], "popularities": [], "titles": []}
 
                 score = entry.get("score", 0)
-                formatted_entry = f"{score} - {media['title']['romaji']}"
-                stats_by_season[key]["titles"].append(formatted_entry)
+                title = media["title"]["romaji"]
+                formatted_entry = f"{score} - {title}"
+                stats_by_season[key]["titles"].append((score, title))
                 if score:
                     stats_by_season[key]["scores"].append(score)
                 popularity = media.get("popularity", 0)
@@ -94,15 +102,21 @@ def calculate_statistics(data, global_mean=7.0, total_count=50):
             seen_count=len(details["titles"]), total_count=total_count
         )
 
+        # Titel alphabetisch sortieren (nur basierend auf dem Titel, nicht dem Score)
+        sorted_titles = sorted(details["titles"], key=lambda x: x[1])
+        # Formatierte Liste mit Score wiederherstellen
+        formatted_titles = [f"{score} - {title}" for score, title in sorted_titles]
+
         stats.append({
             "season": season,
             "year": year,
             "anime_count": len(details["titles"]),
             "mean_score": mean_score,
             "weighted_mean": weighted_mean,
-            "anime_list": sorted(details["titles"]),
+            "anime_list": formatted_titles,
         })
     return stats
+
 
 def save_to_excel_with_formatting(stats, filename):
     rows = []

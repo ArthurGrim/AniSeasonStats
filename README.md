@@ -18,14 +18,14 @@ AniSeasonStats is a Python program designed to analyze a user's seasonal anime w
    ```bash
    git clone https://github.com/<YourUsername>/AniSeasonStats.git
 
-    Navigate to the project folder:
+Navigate to the project folder:
 
-cd AniSeasonStats
+    cd AniSeasonStats
 
 Create and activate a virtual environment:
 
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+    python -m venv .venv
+    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 Install the required dependencies:
 

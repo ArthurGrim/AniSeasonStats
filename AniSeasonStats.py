@@ -4,6 +4,8 @@ import time
 import datetime
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 API_URL = "https://graphql.anilist.co"
 
@@ -52,28 +54,7 @@ def fetch_anime_data(username, season, year):
         print(response.json())
         return None
 
-def calculate_combined_weighted_mean(scores, popularities, season_mean, global_mean, seen_count, total_count, wp=0.6, wa=0.4):
-    # Popularitäts-basierter gewichteter Mittelwert
-    popularity_weighted_mean = (
-        sum(score * pop for score, pop in zip(scores, popularities) if score > 0) /
-        sum(pop for score, pop in zip(scores, popularities) if score > 0)
-        if popularities else 0
-    )
-
-    # Aktivitäts-basierter gewichteter Mittelwert
-    activity_ratio = seen_count / total_count if total_count > 0 else 0
-    activity_weighted_mean = (
-        activity_ratio * season_mean + (1 - activity_ratio) * global_mean
-    )
-
-    # Kombinierter gewichteter Mittelwert
-    combined_weighted_mean = round(
-        wp * popularity_weighted_mean + wa * activity_weighted_mean, 2
-    )
-
-    return combined_weighted_mean
-
-def calculate_statistics(data, season, year, global_mean=7.0, total_count=50):
+def calculate_statistics(data, season, year):
     if not data or "data" not in data or "MediaListCollection" not in data["data"]:
         return {
             "season": season,
@@ -103,9 +84,11 @@ def calculate_statistics(data, season, year, global_mean=7.0, total_count=50):
                     popularities.append(popularity)
 
     mean_score = round(sum(scores) / len(scores), 2) if scores else 0
-    weighted_mean = calculate_combined_weighted_mean(
-        scores, popularities, season_mean=mean_score, global_mean=global_mean,
-        seen_count=len(anime_list), total_count=total_count
+    weighted_mean = round(
+        sum(score * pop for score, pop in zip(scores, popularities) if score > 0) /
+        sum(pop for score, pop in zip(scores, popularities) if score > 0)
+        if popularities else 0,
+        2
     )
 
     return {
@@ -161,6 +144,22 @@ def save_to_excel_with_formatting(all_stats, filename):
     wb = load_workbook(filepath)
     ws = wb.active
 
+    # Apply table structure
+    table = Table(displayName="AnimeStats", ref=f"A1:{get_column_letter(ws.max_column)}{ws.max_row}")
+    style = TableStyleInfo(name="TableStyleMedium9", showFirstColumn=False,
+                           showLastColumn=False, showRowStripes=True, showColumnStripes=True)
+    table.tableStyleInfo = style
+    ws.add_table(table)
+
+    # Autofit columns for specific ones
+    for col in ['C', 'D', 'E']:
+        max_length = 0
+        for cell in ws[col]:
+            if cell.value:
+                max_length = max(max_length, len(str(cell.value)))
+        ws.column_dimensions[col].width = max_length + 2
+
+    # Apply conditional formatting
     apply_custom_formatting(ws, "C", top=2, bottom=2)
     apply_custom_formatting(ws, "D", top=2, bottom=2)
     apply_custom_formatting(ws, "E", top=2, bottom=2)

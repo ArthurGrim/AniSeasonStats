@@ -1,9 +1,8 @@
 import requests
 import pandas as pd
-import time
 import datetime
 from openpyxl import load_workbook
-from openpyxl.styles import PatternFill
+from openpyxl.styles import PatternFill, Font
 from openpyxl.utils import get_column_letter
 
 API_URL = "https://graphql.anilist.co"
@@ -156,12 +155,18 @@ def apply_custom_formatting(sheet, column_letter, top=2, bottom=2, ignore_zeros=
     highest = sorted_values[-top:]
 
     green_fill = PatternFill(start_color="32CD32", end_color="32CD32", fill_type="solid")
+    green_font = Font(color="0F703B")
     red_fill = PatternFill(start_color="FF6347", end_color="FF6347", fill_type="solid")
+    red_font = Font(color="9C0006")
 
     for row, _ in lowest:
-        sheet[f"{column_letter}{row}"].fill = red_fill
+        cell = sheet[f"{column_letter}{row}"]
+        cell.fill = red_fill
+        cell.font = red_font
     for row, _ in highest:
-        sheet[f"{column_letter}{row}"].fill = green_fill
+        cell = sheet[f"{column_letter}{row}"]
+        cell.fill = green_fill
+        cell.font = green_font
 
 def apply_autofit(sheet, columns):
     for column in columns:
